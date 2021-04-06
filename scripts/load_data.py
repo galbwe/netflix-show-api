@@ -2,6 +2,9 @@
 Extract data from a csv, transform it to match schema, and load into postgresql.
 """
 import os
+from functools import partial
+from typing import Set
+
 import pandas as pd
 
 
@@ -22,26 +25,15 @@ def load_dataframe(filename, data_dir=DATA_DIR):
     return pd.read_csv(path)
 
 
-def get_distinct_cast_members(cast: pd.Series):
-    cast_member_lists = cast.str.replace(', ', ',').str.split(',').copy()
-    cast_member_lists = cast_member_lists[cast_member_lists.notna()]
+def get_distinct_values_from_delimited_string_series(series: pd.Series) -> Set[str]:
+    value_lists = series.str.replace(', ', ',').str.split(',').copy()
+    value_lists = value_lists[value_lists.notna()]
 
-    distinct_cast_members = set()
-    for _, cast_members in cast_member_lists.iteritems():
-        for cast_member in cast_members:
-            distinct_cast_members.add(cast_member)
-    return distinct_cast_members
-
-
-def get_distinct_genres(listed_in: pd.Series):
-    genre_lists = listed_in.str.replace(', ', ',').str.split(',').copy()
-    genre_lists = genre_lists[genre_lists.notna()]
-
-    distinct_genres = set()
-    for _, genres in genre_lists.iteritems():
-        for genre in genres:
-            distinct_genres.add(genre)
-    return distinct_genres
+    distinct_values = set()
+    for _, values in value_lists.iteritems():
+        for value in values:
+            distinct_values.add(value)
+    return distinct_values
 
 
 # clean date added
@@ -61,6 +53,8 @@ if __name__ == '__main__':
     from pprint import pprint
     pprint(netflix_titles.head())
     pprint('distinct actors: ')
-    pprint(get_distinct_cast_members(netflix_titles.cast))
+    pprint(get_distinct_values_from_delimited_string_series(netflix_titles.cast))
     pprint('distinct genres')
-    pprint(get_distinct_genres(netflix_titles.listed_in))
+    pprint(get_distinct_values_from_delimited_string_series(netflix_titles.listed_in))
+    pprint('distinct countries')
+    pprint(get_distinct_values_from_delimited_string_series(netflix_titles.country))
