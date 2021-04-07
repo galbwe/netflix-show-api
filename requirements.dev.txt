@@ -7,6 +7,7 @@ certifi==2020.12.5
 chardet==4.0.0
 decorator==5.0.5
 fastapi==0.63.0
+flake8==3.9.0
 greenlet==1.0.0
 idna==2.10
 importlib-metadata==3.10.0
@@ -16,18 +17,22 @@ ipython-genutils==0.2.0
 jedi==0.18.0
 Mako==1.1.4
 MarkupSafe==1.1.1
+mccabe==0.6.1
+-e git+git@github.com:galbwe/netflix-show-api.git@b050b8b033d07d904d185388c70fb582a9e7fb5e#egg=netflix_show_api
 numpy==1.20.2
 packaging==20.9
 pandas==1.2.3
 parso==0.8.2
 pexpect==4.8.0
-pg8000==1.19.1
 pickleshare==0.7.5
 pluggy==0.13.1
 prompt-toolkit==3.0.18
+psycopg2-binary==2.8.6
 ptyprocess==0.7.0
 py==1.10.0
+pycodestyle==2.7.0
 pydantic==1.8.1
+pyflakes==2.3.1
 Pygments==2.8.1
 pyparsing==2.4.7
 pytest==6.2.3

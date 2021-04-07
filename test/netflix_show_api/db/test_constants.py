@@ -2,7 +2,7 @@
 These tests ensure someone does not unintentionally change the integer values of enum fields in the database.
 """
 
-from netflix_show_api.db.constants import TITLE_TYPES, RATINGS, COUNTRIES
+from netflix_show_api.db.constants import DURATION_UNITS, TITLE_TYPES, RATINGS, COUNTRIES
 
 
 MESSAGE = "Constant %r was not as expected and may modify enum fields in the database schema. Please check that you did not accidentally change it."
@@ -12,6 +12,13 @@ def test_title_type():
     assert TITLE_TYPES == (
         'movie',
         'tv_show',
+    )
+
+
+def test_duration_unit():
+    assert DURATION_UNITS == (
+        'minutes',
+        'seasons',
     )
 
 

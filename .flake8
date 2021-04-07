@@ -1,0 +1,15 @@
+[flake8]
+    max-line-length = 119
+    exclude =
+        __pycache__,
+        data,
+        *.ini,
+        *.mako,
+        .scrapy,
+        math_genealogy.egg-info,
+        scripts,
+        venv,
+        venv_dev,
+        venv_prod,
+        .tox,
+        setup.py
