@@ -1,18 +1,18 @@
 """
 Defines database schema.
 """
+import hashlib
+import random
 from datetime import datetime
 from enum import Enum as PythonEnum
-from uuid import uuid4
 
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.types import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
 from .constants import TITLE_TYPES, COUNTRIES, RATINGS, DURATION_UNITS, GENRES
-from ..utils import camel_to_snake
+from ..utils import camel_to_snake, create_integer_id
 
 
 class Base:
@@ -20,14 +20,14 @@ class Base:
     def __tablename__(cls):
         return camel_to_snake(cls.__name__)
 
-    id = Column(UUID, primary_key=True, default=uuid4)
-    # TODO: add created, modified, deleted timestamps
+    id = Column(Integer, primary_key=True, default=create_integer_id)
     created = Column(DateTime, default=datetime.now)
     modified = Column(
         DateTime,
         default=datetime.now,
         onupdate=datetime.now)
     deleted = Column(DateTime, nullable=True)
+
 
 
 Base = declarative_base(cls=Base)
@@ -69,36 +69,36 @@ GenreEnum = PythonEnum(
 # assosication tables for M-M relationships
 
 
-cast_member_netflix_title = Table(
-    'cast_member_netflix_title',
-    Base.metadata,
-    Column('cast_member_id', UUID, ForeignKey('cast_member.id')),
-    Column('netflix_title_id', UUID, ForeignKey('netflix_title.id')),
-)
+class CastMemberNetflixTitle(Base):
+
+    # tablename : "cast_member_netflix_title"
+
+    cast_member_id = Column(Integer, ForeignKey('cast_member.id'))
+    netflix_title_id = Column(Integer, ForeignKey('netflix_title.id'))
 
 
-director_netflix_title = Table(
-    'director_netflix_title',
-    Base.metadata,
-    Column('director_id', UUID, ForeignKey('director.id')),
-    Column('netflix_title_id', UUID, ForeignKey('netflix_title.id')),
-)
+class DirectorNetflixTitle(Base):
+
+    # tablename : "director_netflix_title"
+
+    director_id = Column(Integer, ForeignKey('director.id'))
+    netflix_title_id = Column(Integer, ForeignKey('netflix_title.id'))
 
 
-country_netflix_title = Table(
-    'country_netflix_title',
-    Base.metadata,
-    Column('country_id', UUID, ForeignKey('country.id')),
-    Column('netflix_title_id', UUID, ForeignKey('netflix_title.id')),
-)
+class CountryNetflixTitle(Base):
+
+    # tablename : "country_netflix_title"
+
+    country_id = Column(Integer, ForeignKey('country.id'))
+    netflix_title_id = Column(Integer, ForeignKey('netflix_title.id'))
 
 
-genre_netflix_title = Table(
-    'genre_netflix_title',
-    Base.metadata,
-    Column('genre_id', UUID, ForeignKey('genre.id')),
-    Column('netflix_title_id', UUID, ForeignKey('netflix_title.id')),
-)
+class GenreNetflixTitle(Base):
+
+    # tablename : "genre_netflix_title"
+
+    genre_id = Column(Integer, ForeignKey('genre.id'))
+    netflix_title_id = Column(Integer, ForeignKey('netflix_title.id'))
 
 
 # normalized tables that represent M-M relationships
@@ -145,19 +145,19 @@ class NetflixTitle(Base):
     title = Column(String(200), nullable=True)
     director = relationship(
         'Director',
-        secondary=director_netflix_title,
+        secondary="director_netflix_title",
         backref="netflix_titles",
         cascade="all, delete",
     )
     cast_members = relationship(
         'CastMember',
-        secondary=cast_member_netflix_title,
+        secondary="cast_member_netflix_title",
         backref="netflix_titles",
         cascade="all, delete",
     )
     countries = relationship(
         'Country',
-        secondary=country_netflix_title,
+        secondary="country_netflix_title",
         backref="netflix_titles",
         cascade="all, delete",
     )
@@ -168,7 +168,7 @@ class NetflixTitle(Base):
     duration_units = Column(SQLAlchemyEnum(DurationUnitEnum), nullable=True)
     genres = relationship(
         'Genre',
-        secondary=genre_netflix_title,
+        secondary="genre_netflix_title",
         backref="netflix_titles",
         cascade="all, delete",
     )

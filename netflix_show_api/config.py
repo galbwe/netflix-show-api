@@ -11,6 +11,9 @@ POSTGRES_CONNECTION_DEV = "POSTGRES_CONNECTION_DEV"
 POSTGRES_CONNECTION_PROD = "POSTGRES_CONNECTION_PROD"
 
 
+SECRET = "SECRET"
+
+
 class Environment(Enum):
     DEV = auto()
     PROD = auto()
@@ -19,6 +22,7 @@ class Environment(Enum):
 class Config(NamedTuple):
     db_connection: str
     environment: str
+    secret: str
 
 
 def make_config() -> Config:
@@ -37,9 +41,14 @@ def make_config() -> Config:
         db_connection = os.environ[key]
     except KeyError:
         raise EnvironmentError(environment_error % key)
+    try:
+        secret = os.environ[SECRET]
+    except KeyError:
+        raise EnvironmentError(environment_error % SECRET)
     return Config(
         db_connection,
         environment,
+        secret,
     )
 
 

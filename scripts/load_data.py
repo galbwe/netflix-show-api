@@ -2,6 +2,7 @@
 Extract data from a csv, transform it to match schema, and load into postgresql.
 """
 import os
+import random
 from operator import itemgetter
 from pprint import pprint
 from typing import Set
@@ -9,6 +10,7 @@ from typing import Set
 import numpy as np
 import pandas as pd
 from pandas._libs.tslibs.timestamps import Timestamp
+from psycopg2.errors import UniqueViolation
 from netflix_show_api.db.schema import CastMember, Country, Director, Genre, NetflixTitle
 from netflix_show_api.db.data_access import Session
 
@@ -112,27 +114,33 @@ def clean(netflix_titles: pd.DataFrame, column_map = COLUMN_MAP) -> pd.DataFrame
     return cleaned
 
 
-def write_to_postgres(netflix_titles):
-    pass
-
-
-def main(min_, commit_frequency=100):
+def main(min_, commit_frequency=10, seed=None):
+    if seed is None:
+        seed = random.randint(1, 10 ** 4)
     netflix_titles = load_dataframe('netflix_titles.csv')
     n = len(netflix_titles)
 
+    # shuffle so that rows with duplicated director names are probably processed in different transactions
+    random.seed(42)
+    netflix_titles = netflix_titles.sample(frac=1)
+    netflix_titles = netflix_titles.reindex(pd.RangeIndex(n))
+
     netflix_titles = clean(netflix_titles)
     netflix_titles = netflix_titles.iloc[min_:, :]
+
+    # allows for a rerun if there is a key collision
+    random.seed(seed)
 
     session = Session()
 
     try:
         with session.no_autoflush:
             for i, row in netflix_titles.iterrows():
-                pprint(f'processing row {i + min_} of {n}')
+                pprint(f'processing row {i} of {n}')
                 directors = []
                 for director_name in row['director'].split(','):
                     director_name = director_name.strip()
-                    director = session.query(Director).filter(Director.name == director_name).one_or_none()
+                    director = session.query(Director).filter(Director.name == director_name).first()
                     if director is None:
                         director = Director(name=director_name)
                     directors.append(director)
@@ -140,7 +148,7 @@ def main(min_, commit_frequency=100):
                 cast_members = []
                 for cast_member_name in row['cast_members'].split(','):
                     cast_member_name = cast_member_name.strip()
-                    cast_member = session.query(CastMember).filter(CastMember.name == cast_member_name).one_or_none()
+                    cast_member = session.query(CastMember).filter(CastMember.name == cast_member_name).first()
                     if cast_member is None:
                         cast_member = CastMember(name=cast_member_name)
                     cast_members.append(cast_member)
@@ -149,7 +157,7 @@ def main(min_, commit_frequency=100):
                 for country_name in row['countries'].split(','):
                     if country_name:
                         country_name = country_name.strip()
-                        country = session.query(Country).filter(Country.name == country_name).one_or_none()
+                        country = session.query(Country).filter(Country.name == country_name).first()
                         if country is None:
                             country = Country(name=country_name)
                         countries.append(country)
@@ -157,7 +165,7 @@ def main(min_, commit_frequency=100):
                 genres = []
                 for genre_name in row['genres'].split(','):
                     genre_name = genre_name.strip()
-                    genre = session.query(Genre).filter(Genre.name == genre_name).one_or_none()
+                    genre = session.query(Genre).filter(Genre.name == genre_name).first()
                     if genre is None:
                         genre = Genre(name=genre_name)
                     genres.append(genre)
@@ -171,7 +179,6 @@ def main(min_, commit_frequency=100):
                 rating = row['rating']
                 if not isinstance(rating, str):
                     rating = None
-
 
                 session.add(
                     NetflixTitle(
@@ -190,9 +197,13 @@ def main(min_, commit_frequency=100):
                         description=row['description'],
                     )
                 )
-                if (i + min_ + 1) % commit_frequency == 0:
-                    session.commit()
-
+                if (i + 1) % commit_frequency == 0:
+                    try:
+                        session.commit()
+                    except UniqueViolation as uv:
+                        session.rollback()
+                        pprint('Primary key collision. Retrying with new random seed.')
+                        main(i + 1 - commit_frequency)
         session.commit()
     except Exception as e:
         session.rollback()
@@ -201,4 +212,10 @@ def main(min_, commit_frequency=100):
 
 if __name__ == '__main__':
     # update min_ as batches complete successfully
-    main(0)
+    # main(0)
+    # main(1500)
+    # main(3590)
+    # main(3660)
+    # main(4470)
+    # main(4700)
+    main(7170)
