@@ -28,6 +28,16 @@ class Base:
         onupdate=datetime.now)
     deleted = Column(DateTime, nullable=True)
 
+    def __repr__(self):
+        params = " ".join(f"{k}={v!r}" for (k, v) in self.repr_params.items())
+        return f"<{self.__class__.__name__} {params}>"
+
+    @property
+    def repr_params(self):
+        return {
+            "id": self.id,
+        }
+
 
 
 Base = declarative_base(cls=Base)
@@ -111,6 +121,15 @@ class CastMember(Base):
     name = Column(String(100))
     # netflix_titles : reverse relationship
 
+    @property
+    def repr_params(self):
+        return {
+            **super().repr_params,
+            **{
+                "name": self.name,
+            }
+        }
+
 
 class Director(Base):
 
@@ -118,6 +137,15 @@ class Director(Base):
 
     name = Column(String(100))
     # netflix_titles : reverse relationship
+
+    @property
+    def repr_params(self):
+        return {
+            **super().repr_params,
+            **{
+                "name": self.name,
+            }
+        }
 
 
 class Country(Base):
@@ -127,6 +155,15 @@ class Country(Base):
     name = Column(SQLAlchemyEnum(CountryEnum))
     # netflix_titles : reverse relationship
 
+    @property
+    def repr_params(self):
+        return {
+            **super().repr_params,
+            **{
+                "name": self.name,
+            }
+        }
+
 
 class Genre(Base):
 
@@ -135,6 +172,14 @@ class Genre(Base):
     name = Column(SQLAlchemyEnum(GenreEnum))
     # netflix_titles : reverse relationship
 
+    @property
+    def repr_params(self):
+        return {
+            **super().repr_params,
+            **{
+                "name": self.name,
+            }
+        }
 
 # primary detail table
 

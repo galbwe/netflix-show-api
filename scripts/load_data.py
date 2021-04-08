@@ -12,7 +12,7 @@ import pandas as pd
 from pandas._libs.tslibs.timestamps import Timestamp
 from psycopg2.errors import UniqueViolation
 from netflix_show_api.db.schema import CastMember, Country, Director, Genre, NetflixTitle
-from netflix_show_api.db.data_access import Session
+from netflix_show_api.db.queries import Session
 
 
 DATA_DIR = 'data'
