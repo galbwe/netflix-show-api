@@ -55,7 +55,15 @@ def _(pydantic: api.NetflixTitle) -> db.NetflixTitle:
 
 @singledispatch
 def to_pydantic(x):
-    raise TypeError("Failed to convert {!r} to pydantic.".format(x))
+    return x
+
+
+@to_pydantic.register
+def _(x: dict):
+    return {
+        to_pydantic(k): to_pydantic(v)
+        for (k, v) in x.items()
+    }
 
 
 @to_pydantic.register
@@ -66,6 +74,7 @@ def _(x: list):
 @to_pydantic.register
 def _(x: db.NetflixTitle):
     return api.NetflixTitle(
+        id=x.id,
         netflix_show_id=x.netflix_show_id,
         title_type=to_pydantic(x.title_type),
         title=x.title,

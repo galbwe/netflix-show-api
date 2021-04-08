@@ -2,7 +2,7 @@
 Contains views for rest api.
 """
 
-from typing import List
+from typing import List, Optional, Dict, Union, Set
 
 from fastapi import FastAPI, HTTPException
 
@@ -20,10 +20,32 @@ def get_summary_of_netflix_titles() -> models.NetflixTitlesSummary:
     pass
 
 
-@app.get("/netflix-titles")
-def get_netflix_titles(page: int = 1, perpage: int = 10) -> List[models.NetflixTitle]:
-    query_results : List[db.NetflixTitle] = queries.get_netflix_titles(page, perpage)
-    return to_pydantic(query_results)
+@app.get("/netflix-titles", response_model=List[models.NetflixTitle], response_model_exclude_none=True)
+def get_netflix_titles(
+        page: int = 1,
+        perpage: int = 10,
+        include: Optional[str] = None,
+        exclude: Optional[str] = None,
+        order_by: str = "id",
+        descending: bool = False,
+) -> List[models.NetflixTitle]:
+    query_results : List[Dict] = queries.get_netflix_titles(
+        page,
+        perpage,
+        _parse_delimited(include),
+        _parse_delimited(exclude),
+    )
+    # return query_results
+    return [
+        models.NetflixTitle(**qr)
+        for qr in query_results
+    ]
+
+
+def _parse_delimited(fields: Optional[str], delim=',') -> Optional[Set[str]]:
+    if fields is None:
+        return
+    return {field.strip() for field in fields.split(delim)}
 
 
 @app.get("/netflix-titles/{id}")

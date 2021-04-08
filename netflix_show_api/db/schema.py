@@ -38,6 +38,13 @@ class Base:
             "id": self.id,
         }
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "created": self.created,
+            "modified": self.modified,
+            "deleted": self.deleted,
+        }
 
 
 Base = declarative_base(cls=Base)
@@ -130,6 +137,15 @@ class CastMember(Base):
             }
         }
 
+    def __str__(self):
+        return self.name
+
+    def to_dict(self):
+        return {
+            **super().to_dict(self),
+            "name": str(self),
+        }
+
 
 class Director(Base):
 
@@ -145,6 +161,16 @@ class Director(Base):
             **{
                 "name": self.name,
             }
+        }
+
+
+    def __str__(self):
+        return self.name
+
+    def to_dict(self):
+        return {
+            **super().to_dict(self),
+            "name": str(self),
         }
 
 
@@ -164,6 +190,14 @@ class Country(Base):
             }
         }
 
+    def __str__(self):
+        return str(self.name).split('.')[-1]
+
+    def to_dict(self):
+        return {
+            **super().__dict__(self),
+            "name": str(self),
+        }
 
 class Genre(Base):
 
@@ -180,6 +214,16 @@ class Genre(Base):
                 "name": self.name,
             }
         }
+
+    def __str__(self):
+        return str(self.name).split('.')[-1]
+
+    def to_dict(self):
+        return {
+            **super().to_dict(),
+            "name": str(self),
+        }
+
 
 # primary detail table
 
@@ -218,3 +262,29 @@ class NetflixTitle(Base):
         cascade="all, delete",
     )
     description = Column(String(1000), nullable=True)
+
+    @property
+    def repr_params(self):
+        return {
+            **super().repr_params,
+            "title_type": self.title_type,
+            "title": self.title,
+        }
+
+    def to_dict(self):
+        return {
+            **super().to_dict(),
+            "netflix_show_id": self.netflix_show_id,
+            "title_type": str(self.title_type),
+            "title": self.title,
+            "director": [str(d) for d in self.director if str(d)],
+            "cast_members": [str(cm) for cm in self.cast_members if str(cm)],
+            "countries": [str(c) for c in self.countries if str(c)],
+            "netflix_date_added": self.netflix_date_added,
+            "release_year": self.release_year,
+            "rating": str(self.rating),
+            "duration": self.duration,
+            "duration_units": str(self.duration_units),
+            "genres": [str(g) for g in self.genres if str(g)],
+            "description": self.description,
+        }
