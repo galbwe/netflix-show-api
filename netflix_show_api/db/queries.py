@@ -34,18 +34,29 @@ def get_netflix_titles(
     perpage: int,
     include: Optional[List[str]] = None,
     exclude: Optional[List[str]] = None,
+    order_by = None,
 ) -> List[Dict]:
     session = Session()
 
-    query_results = _query_results(page, perpage)
+    query_results = _query_results(page, perpage, order_by)
 
     return _filter_columns(query_results, include, exclude)
 
 
 @lru_cache(maxsize=100)
-def _query_results(page, perpage):
+def _query_results(page, perpage, order_by):
     session = Session()
     query = session.query(NetflixTitle)
+
+    if order_by:
+        for param in order_by:
+            column = getattr(NetflixTitle, param.field, None)
+            if column is None:
+                continue
+            if param.descending:
+                column = column.desc()
+            query = query.order_by(column)
+
     page_range = slice(
         (page - 1) * perpage,
         (page) * perpage,
