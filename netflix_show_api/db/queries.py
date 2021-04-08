@@ -1,8 +1,9 @@
 import logging
-from typing import Optional, List, Dict
+import pdb
+from typing import Optional, List, Dict, Tuple
 from functools import lru_cache
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
 
 import netflix_show_api.db.schema as db
@@ -34,19 +35,24 @@ def get_netflix_titles(
     perpage: int,
     include: Optional[List[str]] = None,
     exclude: Optional[List[str]] = None,
-    order_by = None,
+    order_by: "OrderByParam" = None,
+    search: Optional[Tuple[str]] = None,
 ) -> List[Dict]:
     session = Session()
 
-    query_results = _query_results(page, perpage, order_by)
+    query_results = _query_results(page, perpage, order_by, search)
 
     return _filter_columns(query_results, include, exclude)
 
 
-@lru_cache(maxsize=100)
-def _query_results(page, perpage, order_by):
+@lru_cache(maxsize=1000)
+def _query_results(page: int, perpage: int, order_by: "OrderByParam", search: Tuple[str]):
     session = Session()
     query = session.query(NetflixTitle)
+    if search:
+        search_str = '+'.join(search)
+        query = query.filter(
+                    NetflixTitle.__ts_vector__.match(search_str, postgresql_reconfig='english'))
 
     if order_by:
         for param in order_by:

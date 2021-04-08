@@ -6,8 +6,9 @@ import random
 from datetime import datetime
 from enum import Enum as PythonEnum
 
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Table
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, func, cast, Index
 from sqlalchemy.types import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
@@ -228,7 +229,21 @@ class Genre(Base):
 # primary detail table
 
 
+def _create_tsvector(*args):
+    """
+    Helper function for creating a text-search index
+
+    See https://stackoverflow.com/questions/42388956/create-a-full-text-search-index-with-sqlalchemy-on-postgresql/53217555
+    """
+    exp = args[0]
+    for e in args[1:]:
+        exp += ' ' + e
+    return func.to_tsvector('english', exp)
+
+
 class NetflixTitle(Base):
+
+
     netflix_show_id = Column(String(32), nullable=True)
     title_type = Column(SQLAlchemyEnum(TitleTypeEnum), nullable=True)
     title = Column(String(200), nullable=True)
@@ -262,6 +277,21 @@ class NetflixTitle(Base):
         cascade="all, delete",
     )
     description = Column(String(1000), nullable=True)
+
+    # for full text search
+    # see https://stackoverflow.com/questions/42388956/create-a-full-text-search-index-with-sqlalchemy-on-postgresql/53217555
+    __ts_vector__ = _create_tsvector(
+        cast(func.coalesce(title, ''), postgresql.TEXT),
+        cast(func.coalesce(description, ''), postgresql.TEXT),
+    )
+
+    __table_args__ = (
+        Index(
+            'idx_title_fts',
+            __ts_vector__,
+            postgresql_using='gin'
+        ),
+    )
 
     @property
     def repr_params(self):
