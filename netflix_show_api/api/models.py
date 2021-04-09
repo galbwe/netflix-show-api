@@ -2,7 +2,7 @@
 Pydantic models for specifying api body parameters and return types.
 """
 from datetime import date, datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from pydantic import BaseModel
 
@@ -41,5 +41,39 @@ class NetflixTitle(BaseModel):
     description: Optional[str] = None
 
 
-class NetflixTitlesSummary(BaseModel):
+ParameterName = str
+
+
+GroupName = str
+
+
+BarPlot = Dict[str, int]
+
+class SummaryStatistics(BaseModel):
     count: int
+    null: int
+    mean: float
+    std: float
+    min: float
+    percentile_25: float
+    percentile_50: float
+    percentile_75: float
+    max: float
+
+
+Group = Dict[ParameterName, SummaryStatistics]
+
+
+class Summary(BaseModel):
+    duration: SummaryStatistics
+    ratings: BarPlot
+    release_year: BarPlot
+    year_added: BarPlot
+
+
+class NetflixTitlesSummary(BaseModel):
+    titles: int
+    directors: int
+    cast_members: int
+    movies: Summary
+    shows: Summary

@@ -24,9 +24,10 @@ def id_not_found(id: int) -> HTTPException:
 
 # TODO: number of titles
 # TODO: aggregated summaries grouped by country, director, genre,
-@app.get("/titles-summary")
+@app.get("/summary")
 def get_summary_of_netflix_titles() -> models.NetflixTitlesSummary:
-    pass
+    query_results: Dict = queries.get_summary_of_netflix_titles()
+    return models.NetflixTitlesSummary(**query_results)
 
 
 # TODO: debug LIKE query in filter, it only seems to return one object
@@ -79,7 +80,6 @@ def create_new_netflix_title(netflix_title: models.NetflixTitle) -> models.Netfl
     raise HTTPException(422, "Could not create resource for new netflix title object.")
 
 
-# TODO: edit existing title
 @app.put("/netflix-titles/{id}")
 def update_netflix_title(id: int, netflix_title: models.NetflixTitle) -> models.NetflixTitle:
     query_result: Optional[Dict] = queries.update_netflix_title(id, netflix_title.dict())

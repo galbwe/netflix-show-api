@@ -1,10 +1,12 @@
 import logging
+import math
+from collections import Counter
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, Dict, Tuple, Callable
+from typing import Optional, List, Dict, Tuple, Callable, Hashable
 
-from sqlalchemy import create_engine, or_
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, or_, func, distinct, tuple_
+from sqlalchemy.orm import sessionmaker, Query
 
 import netflix_show_api.config as config
 import netflix_show_api.db.schema as db
@@ -37,6 +39,29 @@ MAX_INSERT_ATTEMPTS = 10
 # PUBLIC INTERFACE
 # ------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------
+
+
+@timed_cache(seconds=CACHE_TIMEOUT_SECONDS)
+def get_summary_of_netflix_titles() -> Dict:
+    query_result = {}
+
+    session = Session()
+
+    query_result['directors'] = session.query(Director).distinct(Director.name).count()
+
+    query_result['cast_members'] = session.query(CastMember).distinct(CastMember.name).count()
+
+    titles_query = new_query_on_all_columns(session, NetflixTitle)
+
+    query_result['titles'] = titles_query.count()
+
+    movies = titles_query.filter(NetflixTitle.title_type == TitleTypeEnum.movie)
+    query_result['movies'] = _get_query_statistics(movies)
+
+    shows = titles_query.filter(NetflixTitle.title_type == TitleTypeEnum.tv_show)
+    query_result['shows'] = _get_query_statistics(shows)
+
+    return query_result
 
 
 @timed_cache(seconds=CACHE_TIMEOUT_SECONDS)
@@ -380,3 +405,76 @@ def _get_orm_objects_for_netflix_title(title_data: Dict, session: Session) -> Di
     )
 
 
+def _get_query_statistics(query: Query) -> Dict:
+    stats = {}
+    stats['count'] = query.count()
+    stats['duration'] = _compute_summary_stats(query, NetflixTitle, 'duration', count=stats['count'])
+    stats['ratings'] = _bar_plot(query, 'rating')
+    stats['release_year'] = _bar_plot(query, 'release_year', str)
+    stats['year_added'] = _bar_plot(query, 'netflix_date_added', _get_year_from_datetime)
+    return stats
+
+
+def _compute_summary_stats(query: Query, model: Base, field: str, count=None):
+    if count is None:
+        count = query.count()
+    column = getattr(model, field)
+    null = query.filter(column == None).count()
+    nonnull = count - null
+    query = query.order_by(column)
+    percentile_25_idx = int(0.25 * nonnull)
+    percentile_50_idx = int(0.5 * nonnull)
+    percentile_75_idx = int(0.75 * nonnull)
+    min_ = None
+    percentile_25 = None
+    percentile_50 = None
+    percentile_75 = None
+    max_ = None
+    mean_X = 0  #  E[X]
+    mean_X_squared = 0  # E[X^2]
+    for i, row in enumerate(query):
+        value = getattr(row, field)
+        mean_X += value / nonnull
+        mean_X_squared += value ** 2 / nonnull
+        if i == 0:
+            min_ = value
+        if i == percentile_25_idx:
+            percentile_25 = value
+        if i == percentile_50_idx:
+            percentile_50 = value
+        if i == percentile_75_idx:
+            percentile_75 = value
+        if i == nonnull - 1:
+            max_ = value
+    variance = mean_X_squared - mean_X ** 2
+    std = math.sqrt(variance)
+    return {
+        "count": count,
+        "null": null,
+        "mean": mean_X,
+        "std": std,
+        "min": min_,
+        "percentile_25": percentile_25,
+        "percentile_50": percentile_50,
+        "percentile_75": percentile_75,
+        "max": max_,
+    }
+
+
+def _default_bar_plot_postprocess(v):
+    return str(v).split('.')[-1]
+
+
+def _get_year_from_datetime(v):
+    if v is not None:
+        return str(v.year)
+    return 'None'
+
+
+def _bar_plot(
+        query: Query,
+        field: str,
+        postprocess: Callable = _default_bar_plot_postprocess) -> Dict:
+    return dict(Counter(
+        (postprocess(getattr(row, field)) for row in query)
+    ))
