@@ -63,7 +63,6 @@ def get_netflix_titles(
     ]
 
 
-# TODO: get by id
 @app.get("/netflix-titles/{id}", response_model=models.NetflixTitle)
 def get_netflix_title_by_id(id: int) -> models.NetflixTitle:
     query_result: Optional[Dict] = queries.get_netflix_title_by_id(id)
@@ -73,9 +72,12 @@ def get_netflix_title_by_id(id: int) -> models.NetflixTitle:
 
 
 # TODO: create new title
-@app.post("/netflix-titles")
+@app.post("/netflix-titles", response_model=models.NetflixTitle)
 def create_new_netflix_title(netflix_title: models.NetflixTitle) -> models.NetflixTitle:
-    pass
+    query_result: Optional[Dict] = queries.create_new_netflix_title(netflix_title.dict())
+    if query_result:
+        return models.NetflixTitle(**query_result)
+    raise HTTPException(422, "Could not create resource for new netflix title object.")
 
 
 # TODO: edit existing title
@@ -84,7 +86,6 @@ def update_netflix_title(id: int, netflix_title: models.NetflixTitle) -> models.
     pass
 
 
-# TODO: delete existing
 @app.delete("/netflix-titles/{id}")
 def delete_netflix_title(id: int) -> models.NetflixTitle:
     query_result: Optional[Dict] = queries.delete_netflix_title_by_id(id)

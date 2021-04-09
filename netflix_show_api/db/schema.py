@@ -249,19 +249,16 @@ class NetflixTitle(Base):
         'Director',
         secondary="director_netflix_title",
         backref="netflix_titles",
-        cascade="all, delete",
     )
     cast_members = relationship(
         'CastMember',
         secondary="cast_member_netflix_title",
         backref="netflix_titles",
-        cascade="all",
     )
     countries = relationship(
         'Country',
         secondary="country_netflix_title",
         backref="netflix_titles",
-        cascade="all, delete",
     )
     netflix_date_added = Column(Date, nullable=True)
     release_year = Column(Integer, nullable=True)
@@ -272,7 +269,6 @@ class NetflixTitle(Base):
         'Genre',
         secondary="genre_netflix_title",
         backref="netflix_titles",
-        cascade="all, delete",
     )
     description = Column(String(1000), nullable=True)
 

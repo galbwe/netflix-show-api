@@ -222,3 +222,12 @@ GENRE_ALIASES = create_aliases(GENRES)
 
 
 COUNTRY_ALIASES = create_aliases(COUNTRIES)
+
+
+TITLE_TYPE_ALIASES = create_aliases(TITLE_TYPES)
+
+
+DURATION_UNIT_ALIASES = create_aliases(DURATION_UNITS)
+
+
+RATING_ALIASES = create_aliases(RATINGS)
