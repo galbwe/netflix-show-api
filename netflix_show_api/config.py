@@ -14,6 +14,9 @@ POSTGRES_CONNECTION_PROD = "POSTGRES_CONNECTION_PROD"
 SECRET = "SECRET"
 
 
+CACHE_TIMEOUT_SECONDS = "CACHE_TIMEOUT_SECONDS"
+
+
 class Environment(Enum):
     DEV = auto()
     PROD = auto()
@@ -23,6 +26,7 @@ class Config(NamedTuple):
     db_connection: str
     environment: str
     secret: str
+    cache_timeout_seconds: int
 
 
 def make_config() -> Config:
@@ -45,10 +49,18 @@ def make_config() -> Config:
         secret = os.environ[SECRET]
     except KeyError:
         raise EnvironmentError(environment_error % SECRET)
+    try:
+        cache_timeout_seconds = int(os.environ[CACHE_TIMEOUT_SECONDS])
+    except KeyError:
+        raise EnvironmentError(environment_error % CACHE_TIMEOUT_SECONDS)
+    except ValueError:
+        raise EnvironmentError(
+            f"Could not parse {CACHE_TIMEOUT_SECONDS!r} environment variable with value of {cache_timeout_seconds!r} to int.")
     return Config(
         db_connection,
         environment,
         secret,
+        cache_timeout_seconds,
     )
 
 

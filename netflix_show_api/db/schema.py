@@ -1,8 +1,6 @@
 """
 Defines database schema.
 """
-import hashlib
-import random
 from datetime import datetime
 from enum import Enum as PythonEnum
 
@@ -257,7 +255,7 @@ class NetflixTitle(Base):
         'CastMember',
         secondary="cast_member_netflix_title",
         backref="netflix_titles",
-        cascade="all, delete",
+        cascade="all",
     )
     countries = relationship(
         'Country',

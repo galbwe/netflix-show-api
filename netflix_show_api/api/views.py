@@ -18,6 +18,10 @@ from ..parsers import parse_delimited, parse_filter_parameter, parse_order_by, p
 app = FastAPI()
 
 
+def id_not_found(id: int) -> HTTPException:
+    return HTTPException(status_code=404, detail=f"No netflix title found with id {id!r}.")
+
+
 # TODO: number of titles
 # TODO: aggregated summaries grouped by country, director, genre,
 @app.get("/titles-summary")
@@ -60,9 +64,12 @@ def get_netflix_titles(
 
 
 # TODO: get by id
-@app.get("/netflix-titles/{id}")
+@app.get("/netflix-titles/{id}", response_model=models.NetflixTitle)
 def get_netflix_title_by_id(id: int) -> models.NetflixTitle:
-    pass
+    query_result: Optional[Dict] = queries.get_netflix_title_by_id(id)
+    if query_result:
+        return models.NetflixTitle(**query_result)
+    raise id_not_found(id)
 
 
 # TODO: create new title
@@ -80,4 +87,7 @@ def update_netflix_title(id: int, netflix_title: models.NetflixTitle) -> models.
 # TODO: delete existing
 @app.delete("/netflix-titles/{id}")
 def delete_netflix_title(id: int) -> models.NetflixTitle:
-    pass
+    query_result: Optional[Dict] = queries.delete_netflix_title_by_id(id)
+    if query_result:
+        return models.NetflixTitle(**query_result)
+    raise id_not_found(id)

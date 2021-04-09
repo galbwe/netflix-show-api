@@ -1,26 +1,36 @@
 import logging
 import pdb
+from datetime import datetime
 from typing import Optional, List, Dict, Tuple
-from functools import lru_cache
 
 from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
 
+import netflix_show_api.config as config
 import netflix_show_api.db.schema as db
 import netflix_show_api.db.queries as queries
 from .constants import GENRE_ALIASES, COUNTRY_ALIASES
-from ..config import CONFIG
 from ..parsers import OrderByParam, FilterOperator, FilterParam
 from .schema import Base, CastMember, Director, Country, Genre, GenreEnum, NetflixTitle, CountryEnum
+from ..utils import timed_cache
 
 
 logger = logging.getLogger(__name__)
 
 
-engine = create_engine(CONFIG.db_connection)
+engine = create_engine(config.CONFIG.db_connection)
 
 
 Session = sessionmaker(bind=engine)
+
+
+CACHE_TIMEOUT_SECONDS = config.CONFIG.cache_timeout_seconds
+
+
+def new_query_on_all_columns(session: Session, model: Base):
+    query = session.query(model)
+    # exclude items that have been soft deleted
+    return query.filter(model.deleted == None)
 
 
 def get_object_by_name(model: Base, name: str) -> Optional[Base]:
@@ -46,14 +56,17 @@ def get_netflix_titles(
     release_year: Optional[FilterParam] = None,
 ) -> List[Dict]:
 
+    session = Session()
+
     query_results = _query_results(
-        page, perpage, order_by, search, genre, country, cast_member, director, release_year)
+        session, page, perpage, order_by, search, genre, country, cast_member, director, release_year)
 
     return _filter_columns(query_results, include, exclude)
 
 
-@lru_cache(maxsize=1000)
+@timed_cache(seconds=CACHE_TIMEOUT_SECONDS)
 def _query_results(
+    session: Session,
     page: int,
     perpage: int,
     order_by: OrderByParam,
@@ -65,12 +78,11 @@ def _query_results(
     release_year: Optional[FilterParam],
     genre_aliases: Tuple[Tuple[str]] = GENRE_ALIASES,
     country_aliases: Tuple[Tuple[str]] = COUNTRY_ALIASES,
-):
+) -> List[Dict]:
 
     genre_aliases = dict(genre_aliases)
 
-    session = Session()
-    query = session.query(NetflixTitle)
+    query = new_query_on_all_columns(session, NetflixTitle)
 
     # filter on genre
     if genre and genre.operator == FilterOperator.EQUAL:
@@ -91,6 +103,7 @@ def _query_results(
     # filter on release year
     if release_year and release_year.operator in (FilterOperator.EQUAL, FilterOperator.GREATER_THAN, FilterOperator.LESS_THAN, FilterOperator.GREATER_THAN_OR_EQUAL, FilterOperator.LESS_THAN_OR_EQUAL):
         query = _filter_on_integer_field(query, release_year, NetflixTitle.release_year, session)
+
 
     if search:
         search_str = '+'.join(search)
@@ -180,3 +193,35 @@ def _filter_columns(query_results, include, exclude):
         }
         for query_result in query_results
     ]
+
+
+@timed_cache(seconds=CACHE_TIMEOUT_SECONDS)
+def get_netflix_title_by_id(id: int) -> Optional[Dict]:
+
+    query = new_query_on_all_columns(Session(), NetflixTitle)
+
+    title_obj = query.filter(NetflixTitle.id == id).first()
+
+    if title_obj:
+        return title_obj.to_dict()
+    return None
+
+
+def delete_netflix_title_by_id(id: int) -> Optional[Dict]:
+    """
+    Performs a soft delete on netflix title with the given id.
+    """
+    session = Session()
+    query = new_query_on_all_columns(session, NetflixTitle)
+
+    title_obj = query.filter(NetflixTitle.id == id).first()
+
+    if title_obj is None:
+        return None
+    try:
+        title_obj.deleted = datetime.now()
+        session.commit()
+        return title_obj.to_dict()
+    except Exception as e:
+        session.rollback()
+        raise e
