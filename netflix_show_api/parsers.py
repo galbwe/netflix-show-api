@@ -35,7 +35,7 @@ def parse_order_by(fields: Optional[str], delim=',', descending_postfix=_DESCEND
     return tuple(params)
 
 
-_SEARCH_VALIDATION_REGEX = re.compile(r'[+\w\s\d]{2,100}')
+_SEARCH_VALIDATION_REGEX = re.compile(r'[+\w\s\d]{1,100}')
 
 
 # TODO: add more sql injections to catch up front
@@ -49,7 +49,7 @@ _FORBIDDEN_SEARCH_PATTERNS = (
 def parse_search(
     search: Optional[str],
     sep: str = ' ',
-    min_search_length=2,
+    min_search_length=1,
     max_search_length=50,
     search_validation_regex=_SEARCH_VALIDATION_REGEX,
     forbidden_search_patterns=_FORBIDDEN_SEARCH_PATTERNS

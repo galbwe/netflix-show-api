@@ -32,21 +32,14 @@ CACHE_TIMEOUT_SECONDS = config.CONFIG.cache_timeout_seconds
 MAX_INSERT_ATTEMPTS = 10
 
 
-def new_query_on_all_columns(session: Session, model: Base):
-    query = session.query(model)
-    # exclude items that have been soft deleted
-    return query.filter(model.deleted == None)
+# ------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+# PUBLIC INTERFACE
+# ------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
 
 
-def get_object_by_name(model: Base, name: str) -> Optional[Base]:
-    session = Session()
-    try:
-        return session.query(model).filter(model.name == name).first()
-    except AttributeError as e:
-        logger.error("Suppressing exception %r" % e)
-        raise ValueError("Model passed to 'get_object_by_name' must have a 'name' column.")
-
-
+@timed_cache(seconds=CACHE_TIMEOUT_SECONDS)
 def get_netflix_titles(
     page: int,
     perpage: int,
@@ -70,6 +63,92 @@ def get_netflix_titles(
 
 
 @timed_cache(seconds=CACHE_TIMEOUT_SECONDS)
+def get_netflix_title_by_id(id: int) -> Optional[Dict]:
+
+    query = new_query_on_all_columns(Session(), NetflixTitle)
+
+    title_obj = query.filter(NetflixTitle.id == id).first()
+
+    if title_obj:
+        return title_obj.to_dict()
+    return None
+
+
+def create_new_netflix_title(title_data: Dict, max_attempts=MAX_INSERT_ATTEMPTS) -> Optional[Dict]:
+    session = Session()
+
+    def _new_model_instance() -> NetflixTitle:
+        nonlocal title_data
+        nonlocal session
+        return NetflixTitle(**_get_orm_objects_for_netflix_title(title_data, session))
+
+    model = retry_insert(session, _new_model_instance, max_attempts)
+    return model.to_dict()
+
+
+def update_netflix_title(id: int, title_data: Dict) -> Optional[Dict]:
+    session = Session()
+    query = new_query_on_all_columns(session, NetflixTitle)
+
+    title_obj = query.filter(NetflixTitle.id == id).first()
+
+    if title_obj is None:
+        return None
+
+    try:
+        orm_objects: Dict = _get_orm_objects_for_netflix_title(title_data, session)
+        for attribute, value in orm_objects.items():
+            setattr(title_obj, attribute, value)
+        session.commit()
+        return title_obj.to_dict()
+    except Exception as e:
+        session.rollback()
+        raise e
+
+
+def delete_netflix_title_by_id(id: int) -> Optional[Dict]:
+    """
+    Performs a soft delete on netflix title with the given id.
+    """
+    session = Session()
+    query = new_query_on_all_columns(session, NetflixTitle)
+
+    title_obj = query.filter(NetflixTitle.id == id).first()
+
+    if title_obj is None:
+        return None
+    try:
+        title_obj.deleted = datetime.now()
+        session.commit()
+        return title_obj.to_dict()
+    except Exception as e:
+        session.rollback()
+        raise e
+
+
+# ------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+# PRIVATE HELPER METHODS
+# ------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+
+
+def new_query_on_all_columns(session: Session, model: Base):
+    query = session.query(model)
+    # exclude items that have been soft deleted
+    return query.filter(model.deleted == None)
+
+
+def get_object_by_name(model: Base, name: str) -> Optional[Base]:
+    session = Session()
+    try:
+        return session.query(model).filter(model.name == name).first()
+    except AttributeError as e:
+        logger.error("Suppressing exception %r" % e)
+        raise ValueError("Model passed to 'get_object_by_name' must have a 'name' column.")
+
+
+@timed_cache(seconds=CACHE_TIMEOUT_SECONDS)
 def _query_results(
     session: Session,
     page: int,
@@ -89,26 +168,16 @@ def _query_results(
 
     query = new_query_on_all_columns(session, NetflixTitle)
 
-    # filter on genre
-    if genre and genre.operator == FilterOperator.EQUAL:
-        query = _add_filter_on_enum_field(query, genre, GenreEnum, Genre, genre_aliases, NetflixTitle.genres, session)
-
-    # filter on country
-    if country and country.operator == FilterOperator.EQUAL:
-        query = _add_filter_on_enum_field(query, country, CountryEnum, Country, country_aliases, NetflixTitle.countries, session)
-
-    # filter on cast member
-    if cast_member and cast_member.operator in (FilterOperator.EQUAL, FilterOperator.LIKE):
-        query = _filter_on_related_string_field(query, cast_member, CastMember, NetflixTitle.cast_members, session)
-
-    # filter on director
-    if director and director.operator in (FilterOperator.EQUAL, FilterOperator.LIKE):
-        query = _filter_on_related_string_field(query, director, Director, NetflixTitle.director, session)
-
-    # filter on release year
-    if release_year and release_year.operator in (FilterOperator.EQUAL, FilterOperator.GREATER_THAN, FilterOperator.LESS_THAN, FilterOperator.GREATER_THAN_OR_EQUAL, FilterOperator.LESS_THAN_OR_EQUAL):
-        query = _filter_on_integer_field(query, release_year, NetflixTitle.release_year, session)
-
+    query = _add_filter_operations_to_query(
+        session,
+        query,
+        genre,
+        country,
+        cast_member,
+        director,
+        release_year,
+        genre_aliases,
+        country_aliases)
 
     if search:
         search_str = '+'.join(search)
@@ -137,6 +206,41 @@ def _str_to_enum(s: str, enum: Enum, aliases: Tuple[Tuple[str]]):
     if alias is None:
         raise ValueError(f'Could not convert {s!r} to enum of type {enum!r}.')
     return enum[alias]
+
+
+def _add_filter_operations_to_query(
+    session,
+    query,
+    genre,
+    country,
+    cast_member,
+    director,
+    release_year,
+    genre_aliases,
+    country_aliases
+):
+    # filter on genre
+    if genre and genre.operator == FilterOperator.EQUAL:
+        query = _add_filter_on_enum_field(query, genre, GenreEnum, Genre, genre_aliases, NetflixTitle.genres, session)
+
+    # filter on country
+    if country and country.operator == FilterOperator.EQUAL:
+        query = _add_filter_on_enum_field(query, country, CountryEnum, Country, country_aliases, NetflixTitle.countries, session)
+
+    # filter on cast member
+    if cast_member and cast_member.operator in (FilterOperator.EQUAL, FilterOperator.LIKE):
+        query = _filter_on_related_string_field(query, cast_member, CastMember, NetflixTitle.cast_members, session)
+
+    # filter on director
+    if director and director.operator in (FilterOperator.EQUAL, FilterOperator.LIKE):
+        query = _filter_on_related_string_field(query, director, Director, NetflixTitle.director, session)
+
+    # filter on release year
+    if release_year and release_year.operator in (FilterOperator.EQUAL, FilterOperator.GREATER_THAN, FilterOperator.LESS_THAN, FilterOperator.GREATER_THAN_OR_EQUAL, FilterOperator.LESS_THAN_OR_EQUAL):
+        query = _filter_on_integer_field(query, release_year, NetflixTitle.release_year, session)
+
+    return query
+
 
 
 def _add_filter_on_enum_field(query, filter_param, enum, model, aliases, relationship, session):
@@ -204,69 +308,6 @@ def _filter_columns(query_results, include, exclude):
     ]
 
 
-@timed_cache(seconds=CACHE_TIMEOUT_SECONDS)
-def get_netflix_title_by_id(id: int) -> Optional[Dict]:
-
-    query = new_query_on_all_columns(Session(), NetflixTitle)
-
-    title_obj = query.filter(NetflixTitle.id == id).first()
-
-    if title_obj:
-        return title_obj.to_dict()
-    return None
-
-
-def create_new_netflix_title(title_data: Dict, max_attempts=MAX_INSERT_ATTEMPTS) -> Optional[Dict]:
-    session = Session()
-    def _new_model_instance() -> NetflixTitle:
-        nonlocal title_data
-        nonlocal session
-
-        title_type = title_data.get('title_type')
-        if title_type:
-            title_type = _str_to_enum(title_type, TitleTypeEnum, TITLE_TYPE_ALIASES)
-
-        director = title_data.get('director', [])
-        director = [get_existing_by_name_or_create(session, Director, d) for d in director]
-
-        cast_members = title_data.get('cast_members', [])
-        cast_members = [get_existing_by_name_or_create(session, CastMember, cm) for cm in cast_members]
-
-        genres = title_data.get('genres', [])
-        genres = (_str_to_enum(genre, GenreEnum, GENRE_ALIASES) for genre in genres)
-        genres = [get_existing_by_name_or_create(session, Genre, g) for g in genres]
-
-        countries = title_data.get('countries', [])
-        countries = (_str_to_enum(country, CountryEnum, COUNTRY_ALIASES) for country in countries)
-        countries = [get_existing_by_name_or_create(session, Country, c) for c in countries]
-
-        rating = title_data.get('rating')
-        if rating:
-            rating = _str_to_enum(rating, RatingEnum, RATING_ALIASES)
-
-        duration_units = title_data.get('duration_units')
-        if duration_units:
-            duration_units = _str_to_enum(duration_units, DurationUnitEnum, DURATION_UNIT_ALIASES)
-
-        return NetflixTitle(
-            netflix_show_id=title_data.get('netflix_show_id'),
-            title_type=title_type,
-            title=title_data.get('title'),
-            director=director,
-            cast_members=cast_members,
-            countries=countries,
-            netflix_date_added=title_data.get('netflix_date_added'),
-            release_year=title_data.get('release_year'),
-            rating=rating,
-            duration=title_data.get('duration'),
-            duration_units=duration_units,
-            description=title_data.get('description')
-        )
-
-    model = retry_insert(session, _new_model_instance, max_attempts)
-    return model.to_dict()
-
-
 def retry_insert(session: Session, new_model: Callable, max_attempts: int) -> Optional[Base]:
     attempts = 0
     # retry on primary key collisions
@@ -284,27 +325,58 @@ def retry_insert(session: Session, new_model: Callable, max_attempts: int) -> Op
 
 
 def get_existing_by_name_or_create(session, model, name):
+
+    def _new_model():
+        return model(name=name)
+
     obj = session.query(model).filter(model.name == name).first()
     if obj is None:
-        return retry_insert(session, model(name=name), MAX_INSERT_ATTEMPTS)
+        obj = retry_insert(session, _new_model, MAX_INSERT_ATTEMPTS)
+        if obj is None:
+            raise ValueError(f'Failed to insert {model!r} instance with name {name!r}')
     return obj
 
 
-def delete_netflix_title_by_id(id: int) -> Optional[Dict]:
-    """
-    Performs a soft delete on netflix title with the given id.
-    """
-    session = Session()
-    query = new_query_on_all_columns(session, NetflixTitle)
+def _get_orm_objects_for_netflix_title(title_data: Dict, session: Session) -> Dict:
+    title_type = title_data.get('title_type')
+    if title_type:
+        title_type = _str_to_enum(title_type, TitleTypeEnum, TITLE_TYPE_ALIASES)
 
-    title_obj = query.filter(NetflixTitle.id == id).first()
+    director = title_data.get('director', [])
+    director = [get_existing_by_name_or_create(session, Director, d) for d in director]
 
-    if title_obj is None:
-        return None
-    try:
-        title_obj.deleted = datetime.now()
-        session.commit()
-        return title_obj.to_dict()
-    except Exception as e:
-        session.rollback()
-        raise e
+    cast_members = title_data.get('cast_members', [])
+    cast_members = [get_existing_by_name_or_create(session, CastMember, cm) for cm in cast_members]
+
+    genres = title_data.get('genres', [])
+    genres = (_str_to_enum(genre, GenreEnum, GENRE_ALIASES) for genre in genres)
+    genres = [get_existing_by_name_or_create(session, Genre, g) for g in genres]
+
+    countries = title_data.get('countries', [])
+    countries = (_str_to_enum(country, CountryEnum, COUNTRY_ALIASES) for country in countries)
+    countries = [get_existing_by_name_or_create(session, Country, c) for c in countries]
+
+    rating = title_data.get('rating')
+    if rating:
+        rating = _str_to_enum(rating, RatingEnum, RATING_ALIASES)
+
+    duration_units = title_data.get('duration_units')
+    if duration_units:
+        duration_units = _str_to_enum(duration_units, DurationUnitEnum, DURATION_UNIT_ALIASES)
+
+    return dict(
+        netflix_show_id=title_data.get('netflix_show_id'),
+        title_type=title_type,
+        title=title_data.get('title'),
+        director=director,
+        cast_members=cast_members,
+        countries=countries,
+        netflix_date_added=title_data.get('netflix_date_added'),
+        release_year=title_data.get('release_year'),
+        rating=rating,
+        duration=title_data.get('duration'),
+        duration_units=duration_units,
+        description=title_data.get('description')
+    )
+
+

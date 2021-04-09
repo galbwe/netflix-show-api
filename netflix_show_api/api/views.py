@@ -71,7 +71,6 @@ def get_netflix_title_by_id(id: int) -> models.NetflixTitle:
     raise id_not_found(id)
 
 
-# TODO: create new title
 @app.post("/netflix-titles", response_model=models.NetflixTitle)
 def create_new_netflix_title(netflix_title: models.NetflixTitle) -> models.NetflixTitle:
     query_result: Optional[Dict] = queries.create_new_netflix_title(netflix_title.dict())
@@ -83,7 +82,10 @@ def create_new_netflix_title(netflix_title: models.NetflixTitle) -> models.Netfl
 # TODO: edit existing title
 @app.put("/netflix-titles/{id}")
 def update_netflix_title(id: int, netflix_title: models.NetflixTitle) -> models.NetflixTitle:
-    pass
+    query_result: Optional[Dict] = queries.update_netflix_title(id, netflix_title.dict())
+    if query_result:
+        return models.NetflixTitle(**query_result)
+    raise id_not_found(id)
 
 
 @app.delete("/netflix-titles/{id}")
