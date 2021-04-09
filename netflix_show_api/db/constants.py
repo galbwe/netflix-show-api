@@ -198,3 +198,27 @@ GENRES = (
     'Teen TV Shows',
     'Thrillers'
 )
+
+
+def create_aliases(genres):
+    aliases = set()
+    for genre in genres:
+        variations = [
+            genre,
+            genre.replace('&', 'And'),
+            genre.replace('-', ''),
+            genre.replace('-', ' '),
+        ]
+        for variation in variations:
+            aliases |= set([
+                (variation, variation),
+                (variation.lower(), variation),
+                (variation.upper(), variation),
+            ])
+    return tuple(aliases)
+
+
+GENRE_ALIASES = create_aliases(GENRES)
+
+
+COUNTRY_ALIASES = create_aliases(COUNTRIES)
