@@ -4,14 +4,25 @@ Defines database schema.
 from datetime import datetime
 from enum import Enum as PythonEnum
 
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    cast,
+    func,
+)
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, func, cast, Index
-from sqlalchemy.types import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
+from sqlalchemy.orm import relationship
+from sqlalchemy.types import Enum as SQLAlchemyEnum
 
-from .constants import TITLE_TYPES, COUNTRIES, RATINGS, DURATION_UNITS, GENRES
 from ..utils import camel_to_snake, create_integer_id
+from .constants import COUNTRIES, DURATION_UNITS, GENRES, RATINGS, TITLE_TYPES
 
 
 class Base:
@@ -21,10 +32,7 @@ class Base:
 
     id = Column(Integer, primary_key=True, default=create_integer_id)
     created = Column(DateTime, default=datetime.now)
-    modified = Column(
-        DateTime,
-        default=datetime.now,
-        onupdate=datetime.now)
+    modified = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     deleted = Column(DateTime, nullable=True)
 
     def __repr__(self):
@@ -53,31 +61,31 @@ Base = declarative_base(cls=Base)
 
 
 TitleTypeEnum = PythonEnum(
-    'TitleTypeEnum',
+    "TitleTypeEnum",
     TITLE_TYPES,
 )
 
 
 CountryEnum = PythonEnum(
-    'CountryEnum',
+    "CountryEnum",
     COUNTRIES,
 )
 
 
 RatingEnum = PythonEnum(
-    'RatingEnum',
+    "RatingEnum",
     RATINGS,
 )
 
 
 DurationUnitEnum = PythonEnum(
-    'DurationUnitEnum',
+    "DurationUnitEnum",
     DURATION_UNITS,
 )
 
 
 GenreEnum = PythonEnum(
-    'GenreEnum',
+    "GenreEnum",
     GENRES,
 )
 
@@ -89,32 +97,32 @@ class CastMemberNetflixTitle(Base):
 
     # tablename : "cast_member_netflix_title"
 
-    cast_member_id = Column(Integer, ForeignKey('cast_member.id'))
-    netflix_title_id = Column(Integer, ForeignKey('netflix_title.id'))
+    cast_member_id = Column(Integer, ForeignKey("cast_member.id"))
+    netflix_title_id = Column(Integer, ForeignKey("netflix_title.id"))
 
 
 class DirectorNetflixTitle(Base):
 
     # tablename : "director_netflix_title"
 
-    director_id = Column(Integer, ForeignKey('director.id'))
-    netflix_title_id = Column(Integer, ForeignKey('netflix_title.id'))
+    director_id = Column(Integer, ForeignKey("director.id"))
+    netflix_title_id = Column(Integer, ForeignKey("netflix_title.id"))
 
 
 class CountryNetflixTitle(Base):
 
     # tablename : "country_netflix_title"
 
-    country_id = Column(Integer, ForeignKey('country.id'))
-    netflix_title_id = Column(Integer, ForeignKey('netflix_title.id'))
+    country_id = Column(Integer, ForeignKey("country.id"))
+    netflix_title_id = Column(Integer, ForeignKey("netflix_title.id"))
 
 
 class GenreNetflixTitle(Base):
 
     # tablename : "genre_netflix_title"
 
-    genre_id = Column(Integer, ForeignKey('genre.id'))
-    netflix_title_id = Column(Integer, ForeignKey('netflix_title.id'))
+    genre_id = Column(Integer, ForeignKey("genre.id"))
+    netflix_title_id = Column(Integer, ForeignKey("netflix_title.id"))
 
 
 # normalized tables that represent M-M relationships
@@ -133,7 +141,7 @@ class CastMember(Base):
             **super().repr_params,
             **{
                 "name": self.name,
-            }
+            },
         }
 
     def __str__(self):
@@ -159,9 +167,8 @@ class Director(Base):
             **super().repr_params,
             **{
                 "name": self.name,
-            }
+            },
         }
-
 
     def __str__(self):
         return self.name
@@ -186,17 +193,18 @@ class Country(Base):
             **super().repr_params,
             **{
                 "name": self.name,
-            }
+            },
         }
 
     def __str__(self):
-        return str(self.name).split('.')[-1]
+        return str(self.name).split(".")[-1]
 
     def to_dict(self):
         return {
             **super().__dict__(self),
             "name": str(self),
         }
+
 
 class Genre(Base):
 
@@ -211,11 +219,11 @@ class Genre(Base):
             **super().repr_params,
             **{
                 "name": self.name,
-            }
+            },
         }
 
     def __str__(self):
-        return str(self.name).split('.')[-1]
+        return str(self.name).split(".")[-1]
 
     def to_dict(self):
         return {
@@ -235,28 +243,27 @@ def _create_tsvector(*args):
     """
     exp = args[0]
     for e in args[1:]:
-        exp += ' ' + e
-    return func.to_tsvector('english', exp)
+        exp += " " + e
+    return func.to_tsvector("english", exp)
 
 
 class NetflixTitle(Base):
-
 
     netflix_show_id = Column(String(32), nullable=True)
     title_type = Column(SQLAlchemyEnum(TitleTypeEnum), nullable=True)
     title = Column(String(200), nullable=True)
     director = relationship(
-        'Director',
+        "Director",
         secondary="director_netflix_title",
         backref="netflix_titles",
     )
     cast_members = relationship(
-        'CastMember',
+        "CastMember",
         secondary="cast_member_netflix_title",
         backref="netflix_titles",
     )
     countries = relationship(
-        'Country',
+        "Country",
         secondary="country_netflix_title",
         backref="netflix_titles",
     )
@@ -266,7 +273,7 @@ class NetflixTitle(Base):
     duration = Column(Integer, nullable=True)
     duration_units = Column(SQLAlchemyEnum(DurationUnitEnum), nullable=True)
     genres = relationship(
-        'Genre',
+        "Genre",
         secondary="genre_netflix_title",
         backref="netflix_titles",
     )
@@ -275,17 +282,11 @@ class NetflixTitle(Base):
     # for full text search
     # see https://stackoverflow.com/questions/42388956/create-a-full-text-search-index-with-sqlalchemy-on-postgresql/53217555
     __ts_vector__ = _create_tsvector(
-        cast(func.coalesce(title, ''), postgresql.TEXT),
-        cast(func.coalesce(description, ''), postgresql.TEXT),
+        cast(func.coalesce(title, ""), postgresql.TEXT),
+        cast(func.coalesce(description, ""), postgresql.TEXT),
     )
 
-    __table_args__ = (
-        Index(
-            'idx_title_fts',
-            __ts_vector__,
-            postgresql_using='gin'
-        ),
-    )
+    __table_args__ = (Index("idx_title_fts", __ts_vector__, postgresql_using="gin"),)
 
     @property
     def repr_params(self):
@@ -299,16 +300,16 @@ class NetflixTitle(Base):
         return {
             **super().to_dict(),
             "netflix_show_id": self.netflix_show_id,
-            "title_type": str(self.title_type).split('.')[-1],
+            "title_type": str(self.title_type).split(".")[-1],
             "title": self.title,
             "director": [str(d) for d in self.director if str(d)],
             "cast_members": [str(cm) for cm in self.cast_members if str(cm)],
             "countries": [str(c) for c in self.countries if str(c)],
             "netflix_date_added": self.netflix_date_added,
             "release_year": self.release_year,
-            "rating": str(self.rating).split('.')[-1],
+            "rating": str(self.rating).split(".")[-1],
             "duration": self.duration,
-            "duration_units": str(self.duration_units).split('.')[-1],
+            "duration_units": str(self.duration_units).split(".")[-1],
             "genres": [str(g) for g in self.genres if str(g)],
             "description": self.description,
         }

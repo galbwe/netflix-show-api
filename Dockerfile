@@ -3,6 +3,7 @@ FROM python:3.7-buster
 WORKDIR /app
 
 COPY requirements.prod.txt ./
+COPY logging.config.yaml ./
 RUN pip install --no-cache-dir -r ./requirements.prod.txt
 COPY setup.py ./
 COPY netflix_show_api ./netflix_show_api

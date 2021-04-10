@@ -3,9 +3,11 @@ import hashlib
 import random
 import re
 from datetime import datetime, timedelta
+from typing import Dict, Iterable
+
+import yaml
 
 from .config import CONFIG
-
 
 # ---------------------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------
@@ -15,7 +17,15 @@ from .config import CONFIG
 
 
 def camel_to_snake(s: str):
-    return re.sub(r'(?<!^)(?=[A-Z])', '_', s).lower()
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
+
+
+def read_yaml(stream: Iterable) -> Dict:
+    try:
+        loader = yaml.CLoader
+    except ImportError:
+        loader = yaml.Loader
+    return yaml.load(stream, loader)
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -28,20 +38,24 @@ def camel_to_snake(s: str):
 _DATE_IDENTIFIERS = ("%Y", "%m", "%d", "%H", "%M", "%S")
 
 
-def create_integer_id(secret: str = CONFIG.secret, date_identifiers: str = _DATE_IDENTIFIERS, max_id_length: int = 9) -> int:
+def create_integer_id(
+    secret: str = CONFIG.secret, date_identifiers: str = _DATE_IDENTIFIERS, max_id_length: int = 9
+) -> int:
     if max_id_length > 9:
-        raise ValueError("Received a 'max_id_length' greater than the allowed number of digits in postgesql integer column.")
+        raise ValueError(
+            "Received a 'max_id_length' greater than the allowed number of digits in postgesql integer column."
+        )
     date_identifiers = list(date_identifiers)
     # permute date identifiers to address output that was not uniformly distributed
     random.shuffle(date_identifiers)
-    date_format = ''.join(date_identifiers)
+    date_format = "".join(date_identifiers)
     date = datetime.now().strftime(date_format)
     salt = random.randint(10 ** 6, 10 ** 7 - 1)
     hash_ = hashlib.blake2b(salt=str(salt).encode(), key=str(secret).encode())
     hash_.update(date.encode())
     hash_code = str(int(hash_.hexdigest(), 16))
     characters = min(max_id_length, len(hash_code))
-    return int(hash_code[:characters] , 10)
+    return int(hash_code[:characters], 10)
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -72,5 +86,7 @@ def timed_cache(**timedelta_kwargs):
                 f.cache_clear()
                 next_update = now + update_delta
             return f(*args, **kwargs)
+
         return _wrapped
+
     return _wrapper

@@ -1,6 +1,6 @@
 import os
 from enum import Enum, auto
-from typing import NamedTuple, Callable
+from typing import Callable, NamedTuple
 
 ENVIRONMENT = "ENVIRONMENT"
 
@@ -17,6 +17,9 @@ SECRET = "SECRET"
 CACHE_TIMEOUT_SECONDS = "CACHE_TIMEOUT_SECONDS"
 
 
+LOGGING_CONFIG = "LOGGING_CONFIG"
+
+
 class Environment(Enum):
     DEV = auto()
     PROD = auto()
@@ -27,6 +30,7 @@ class Config(NamedTuple):
     environment: str
     secret: str
     cache_timeout_seconds: int
+    logging_config: str
 
 
 def make_config() -> Config:
@@ -55,13 +59,14 @@ def make_config() -> Config:
         raise EnvironmentError(environment_error % CACHE_TIMEOUT_SECONDS)
     except ValueError:
         raise EnvironmentError(
-            f"Could not parse {CACHE_TIMEOUT_SECONDS!r} environment variable with value of {cache_timeout_seconds!r} to int.")
-    return Config(
-        db_connection,
-        environment,
-        secret,
-        cache_timeout_seconds,
-    )
+            f"Could not parse {CACHE_TIMEOUT_SECONDS!r} environment variable with value of {cache_timeout_seconds!r} to int."
+        )
+    try:
+        logging_config = os.environ[LOGGING_CONFIG]
+    except KeyError:
+        raise EnvironmentError(environment_error % LOGGING_CONFIG)
+
+    return Config(db_connection, environment, secret, cache_timeout_seconds, logging_config)
 
 
 CONFIG = make_config()

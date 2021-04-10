@@ -2,12 +2,11 @@
 Pydantic models for specifying api body parameters and return types.
 """
 from datetime import date, datetime
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
 from ..db import schema
-
 
 TitleType = schema.TitleTypeEnum
 
@@ -41,13 +40,8 @@ class NetflixTitle(BaseModel):
     description: Optional[str] = None
 
 
-ParameterName = str
-
-
-GroupName = str
-
-
 BarPlot = Dict[str, int]
+
 
 class SummaryStatistics(BaseModel):
     count: int
@@ -59,9 +53,6 @@ class SummaryStatistics(BaseModel):
     percentile_50: float
     percentile_75: float
     max: float
-
-
-Group = Dict[ParameterName, SummaryStatistics]
 
 
 class Summary(BaseModel):
