@@ -243,9 +243,7 @@ def _query_results(
 
     if search:
         search_str = "+".join(search)
-        query = query.filter(
-            NetflixTitle.__ts_vector__.match(search_str, postgresql_reconfig="english")
-        )
+        query = _add_search_filter(query, search_str)
 
     if order_by:
         for param in order_by:
@@ -377,6 +375,11 @@ def _filter_columns(query_results, include, exclude):
     ]
 
 
+@log_calls(logger)
+def _add_search_filter(query: Query, search: str) -> Query:
+    return query.filter(NetflixTitle.__ts_vector__.match(search, postgresql_reconfig="english"))
+
+
 def retry_insert(session: Session, new_model: Callable, max_attempts: int) -> Optional[Base]:
     attempts = 0
     # retry on primary key collisions
@@ -388,8 +391,10 @@ def retry_insert(session: Session, new_model: Callable, max_attempts: int) -> Op
             return model
         except Exception:
             session.rollback()
+            logger.info("Key collision on insert. Retrying.")
             attempts += 1
             if attempts >= max_attempts:
+                logger.error("Too many key collisions. Aborting insert and returning None.")
                 return None
 
 
